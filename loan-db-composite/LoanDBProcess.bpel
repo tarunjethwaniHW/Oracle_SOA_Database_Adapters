@@ -1,0 +1,527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<process name="LoanDBProcess"
+         targetNamespace="http://xmlns.oracle.com/LendWise/LoanDBProcess/bpel"
+         xmlns="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+         xmlns:bpws="http://docs.oasis-open.org/wsbpel/2.0/process/executable"
+         xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+         xmlns:bpelx="http://schemas.oracle.com/bpel/extension"
+         xmlns:ora="http://schemas.oracle.com/xpath/extension"
+         xmlns:tns="http://xmlns.oracle.com/LendWise/LoanDBProcess/bpel"
+         xmlns:client="http://xmlns.oracle.com/LendWise/LoanDBProcess"
+         xmlns:types="http://xmlns.oracle.com/LendWise/LoanDBProcess/types"
+         xmlns:loandb="http://xmlns.oracle.com/LendWise/adapter/db/LoanDB"
+         xmlns:borrowerdb="http://xmlns.oracle.com/LendWise/adapter/db/BorrowerDB"
+         xmlns:decisiondb="http://xmlns.oracle.com/LendWise/adapter/db/DecisionDB">
+
+    <!-- ================================================================== -->
+    <!-- BPEL Process - Loan Database Operations                            -->
+    <!-- Orchestrates multiple Database Adapter invocations                 -->
+    <!-- ================================================================== -->
+
+    <!-- Partner Links -->
+    <partnerLinks>
+        <!-- Client Entry Point -->
+        <partnerLink name="LoanDBClient"
+                     partnerLinkType="client:LoanDBProcessPLT"
+                     myRole="LoanDBProcessProvider"/>
+
+        <!-- Database Adapter Partner Links -->
+        <partnerLink name="LoanDBAdapter"
+                     partnerLinkType="loandb:LoanDB_plt"
+                     partnerRole="LoanDBProvider"/>
+
+        <partnerLink name="BorrowerDBAdapter"
+                     partnerLinkType="borrowerdb:BorrowerDB_plt"
+                     partnerRole="BorrowerDBProvider"/>
+
+        <partnerLink name="DecisionDBAdapter"
+                     partnerLinkType="decisiondb:DecisionDB_plt"
+                     partnerRole="DecisionDBProvider"/>
+    </partnerLinks>
+
+    <!-- Variables -->
+    <variables>
+        <!-- Client Request/Response -->
+        <variable name="inputVariable" messageType="client:LoanApplicationRequestMessage"/>
+        <variable name="outputVariable" messageType="client:LoanApplicationResponseMessage"/>
+        <variable name="statusInputVariable" messageType="client:LoanStatusRequestMessage"/>
+        <variable name="statusOutputVariable" messageType="client:LoanStatusResponseMessage"/>
+        <variable name="updateInputVariable" messageType="client:UpdateDecisionRequestMessage"/>
+        <variable name="updateOutputVariable" messageType="client:UpdateDecisionResponseMessage"/>
+        <variable name="faultVariable" messageType="client:LoanDBFaultMessage"/>
+
+        <!-- Borrower DB Adapter Variables -->
+        <variable name="borrowerInsertRequest" messageType="borrowerdb:BorrowerCollectionMessage"/>
+        <variable name="borrowerSelectRequest" messageType="borrowerdb:BorrowerSelectBySSNMessage"/>
+        <variable name="borrowerSelectResponse" messageType="borrowerdb:BorrowerCollectionMessage"/>
+
+        <!-- Loan DB Adapter Variables -->
+        <variable name="loanInsertRequest" messageType="loandb:LoanApplicationCollectionMessage"/>
+        <variable name="loanSelectRequest" messageType="loandb:LoanSelectByIdMessage"/>
+        <variable name="loanSelectResponse" messageType="loandb:LoanApplicationCollectionMessage"/>
+        <variable name="loanUpdateRequest" messageType="loandb:LoanApplicationCollectionMessage"/>
+        <variable name="calculateLTVRequest" messageType="loandb:CalculateLTVInputMessage"/>
+        <variable name="calculateLTVResponse" messageType="loandb:CalculateLTVOutputMessage"/>
+
+        <!-- Decision DB Adapter Variables -->
+        <variable name="decisionInsertRequest" messageType="decisiondb:LoanDecisionCollectionMessage"/>
+        <variable name="decisionSelectRequest" messageType="decisiondb:DecisionSelectByLoanMessage"/>
+        <variable name="decisionSelectResponse" messageType="decisiondb:LoanDecisionCollectionMessage"/>
+        <variable name="riskAssessmentRequest" messageType="decisiondb:RiskAssessmentInputMessage"/>
+        <variable name="riskAssessmentResponse" messageType="decisiondb:RiskAssessmentOutputMessage"/>
+
+        <!-- Working Variables -->
+        <variable name="loanId" type="xsd:string"/>
+        <variable name="borrowerId" type="xsd:long"/>
+        <variable name="ltvRatio" type="xsd:decimal"/>
+        <variable name="riskScore" type="xsd:int"/>
+        <variable name="decision" type="xsd:string"/>
+    </variables>
+
+    <!-- Fault Handlers -->
+    <faultHandlers>
+        <catchAll>
+            <sequence name="HandleAllFaults">
+                <assign name="AssignFaultResponse">
+                    <copy>
+                        <from>'DB_ERROR'</from>
+                        <to>$faultVariable.fault/types:errorCode</to>
+                    </copy>
+                    <copy>
+                        <from>'Database operation failed'</from>
+                        <to>$faultVariable.fault/types:errorMessage</to>
+                    </copy>
+                    <copy>
+                        <from>ora:getCurrentDateTime()</from>
+                        <to>$faultVariable.fault/types:timestamp</to>
+                    </copy>
+                </assign>
+                <reply name="ReplyFault"
+                       partnerLink="LoanDBClient"
+                       portType="client:LoanDBProcess"
+                       operation="submitLoanApplication"
+                       variable="faultVariable"
+                       faultName="client:loanDBFault"/>
+            </sequence>
+        </catchAll>
+    </faultHandlers>
+
+    <!-- Main Sequence -->
+    <sequence name="MainSequence">
+
+        <!-- ============================================================== -->
+        <!-- Pick - Wait for one of three operations                        -->
+        <!-- ============================================================== -->
+
+        <pick name="PickOperation" createInstance="yes">
+
+            <!-- ========================================================== -->
+            <!-- Operation 1: submitLoanApplication                         -->
+            <!-- ========================================================== -->
+            <onMessage partnerLink="LoanDBClient"
+                       portType="client:LoanDBProcess"
+                       operation="submitLoanApplication"
+                       variable="inputVariable">
+                <sequence name="SubmitLoanSequence">
+
+                    <!-- Generate Loan ID -->
+                    <assign name="GenerateLoanId">
+                        <copy>
+                            <from>ora:generateGUID()</from>
+                            <to variable="loanId"/>
+                        </copy>
+                    </assign>
+
+                    <!-- ================================================== -->
+                    <!-- Step 1: Insert Borrower (BorrowerDB.insertBorrower)-->
+                    <!-- ================================================== -->
+
+                    <assign name="PrepareBorrowerInsert">
+                        <copy>
+                            <from>ora:getNextSequenceValue('BORROWER_SEQ')</from>
+                            <to>$borrowerInsertRequest.BorrowerCollection/types:Borrower/types:borrowerId</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:ssn</from>
+                            <to>$borrowerInsertRequest.BorrowerCollection/types:Borrower/types:ssn</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:applicantName</from>
+                            <to>$borrowerInsertRequest.BorrowerCollection/types:Borrower/types:name</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:monthlyIncome</from>
+                            <to>$borrowerInsertRequest.BorrowerCollection/types:Borrower/types:monthlyIncome</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="InsertBorrower"
+                            partnerLink="BorrowerDBAdapter"
+                            portType="borrowerdb:BorrowerDB_ptt"
+                            operation="insertBorrower"
+                            inputVariable="borrowerInsertRequest"/>
+
+                    <assign name="StoreBorrowerId">
+                        <copy>
+                            <from>$borrowerInsertRequest.BorrowerCollection/types:Borrower/types:borrowerId</from>
+                            <to variable="borrowerId"/>
+                        </copy>
+                    </assign>
+
+                    <!-- ================================================== -->
+                    <!-- Step 2: Insert Loan (LoanDB.insertLoanApplication) -->
+                    <!-- ================================================== -->
+
+                    <assign name="PrepareLoanInsert">
+                        <copy>
+                            <from variable="loanId"/>
+                            <to>$loanInsertRequest.LoanApplicationCollection/types:LoanApplication/types:loanId</to>
+                        </copy>
+                        <copy>
+                            <from variable="borrowerId"/>
+                            <to>$loanInsertRequest.LoanApplicationCollection/types:LoanApplication/types:borrowerId</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:loanAmount</from>
+                            <to>$loanInsertRequest.LoanApplicationCollection/types:LoanApplication/types:loanAmount</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:propertyValue</from>
+                            <to>$loanInsertRequest.LoanApplicationCollection/types:LoanApplication/types:propertyValue</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:propertyAddress</from>
+                            <to>$loanInsertRequest.LoanApplicationCollection/types:LoanApplication/types:propertyAddress</to>
+                        </copy>
+                        <copy>
+                            <from>'PENDING'</from>
+                            <to>$loanInsertRequest.LoanApplicationCollection/types:LoanApplication/types:status</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="InsertLoanApplication"
+                            partnerLink="LoanDBAdapter"
+                            portType="loandb:LoanDB_ptt"
+                            operation="insertLoanApplication"
+                            inputVariable="loanInsertRequest"/>
+
+                    <!-- ================================================== -->
+                    <!-- Step 3: Calculate LTV (LoanDB.calculateLTV)        -->
+                    <!-- Stored Procedure: LOAN_PKG.CALCULATE_LTV           -->
+                    <!-- ================================================== -->
+
+                    <assign name="PrepareCalculateLTV">
+                        <copy>
+                            <from>$inputVariable.payload/types:loanAmount</from>
+                            <to>$calculateLTVRequest.CalculateLTVInput/types:loanAmount</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:propertyValue</from>
+                            <to>$calculateLTVRequest.CalculateLTVInput/types:propertyValue</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="CalculateLTV"
+                            partnerLink="LoanDBAdapter"
+                            portType="loandb:LoanDB_ptt"
+                            operation="calculateLTV"
+                            inputVariable="calculateLTVRequest"
+                            outputVariable="calculateLTVResponse"/>
+
+                    <assign name="StoreLTVRatio">
+                        <copy>
+                            <from>$calculateLTVResponse.CalculateLTVOutput/types:ltvRatio</from>
+                            <to variable="ltvRatio"/>
+                        </copy>
+                    </assign>
+
+                    <!-- ================================================== -->
+                    <!-- Step 4: Run Risk Assessment                         -->
+                    <!-- (DecisionDB.runRiskAssessment)                      -->
+                    <!-- Stored Procedure: DECISION_PKG.RUN_RISK_ASSESSMENT -->
+                    <!-- ================================================== -->
+
+                    <assign name="PrepareRiskAssessment">
+                        <copy>
+                            <from variable="loanId"/>
+                            <to>$riskAssessmentRequest.RiskAssessmentInput/types:loanId</to>
+                        </copy>
+                        <copy>
+                            <from>number(720)</from> <!-- Default credit score for demo -->
+                            <to>$riskAssessmentRequest.RiskAssessmentInput/types:creditScore</to>
+                        </copy>
+                        <copy>
+                            <from variable="ltvRatio"/>
+                            <to>$riskAssessmentRequest.RiskAssessmentInput/types:ltvRatio</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:monthlyIncome</from>
+                            <to>$riskAssessmentRequest.RiskAssessmentInput/types:monthlyIncome</to>
+                        </copy>
+                        <copy>
+                            <from>$inputVariable.payload/types:loanAmount</from>
+                            <to>$riskAssessmentRequest.RiskAssessmentInput/types:loanAmount</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="RunRiskAssessment"
+                            partnerLink="DecisionDBAdapter"
+                            portType="decisiondb:DecisionDB_ptt"
+                            operation="runRiskAssessment"
+                            inputVariable="riskAssessmentRequest"
+                            outputVariable="riskAssessmentResponse"/>
+
+                    <assign name="StoreRiskScore">
+                        <copy>
+                            <from>$riskAssessmentResponse.RiskAssessmentOutput/types:riskScore</from>
+                            <to variable="riskScore"/>
+                        </copy>
+                        <copy>
+                            <from>$riskAssessmentResponse.RiskAssessmentOutput/types:recommendation</from>
+                            <to variable="decision"/>
+                        </copy>
+                    </assign>
+
+                    <!-- ================================================== -->
+                    <!-- Step 5: Insert Decision                             -->
+                    <!-- (DecisionDB.insertDecision)                         -->
+                    <!-- ================================================== -->
+
+                    <assign name="PrepareDecisionInsert">
+                        <copy>
+                            <from>ora:generateGUID()</from>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:decisionId</to>
+                        </copy>
+                        <copy>
+                            <from variable="loanId"/>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:loanId</to>
+                        </copy>
+                        <copy>
+                            <from variable="decision"/>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:decision</to>
+                        </copy>
+                        <copy>
+                            <from variable="riskScore"/>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:riskScore</to>
+                        </copy>
+                        <copy>
+                            <from>$riskAssessmentResponse.RiskAssessmentOutput/types:notes</from>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:notes</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="InsertDecision"
+                            partnerLink="DecisionDBAdapter"
+                            portType="decisiondb:DecisionDB_ptt"
+                            operation="insertDecision"
+                            inputVariable="decisionInsertRequest"/>
+
+                    <!-- ================================================== -->
+                    <!-- Step 6: Update Loan Status                          -->
+                    <!-- (LoanDB.updateLoanApplication)                      -->
+                    <!-- ================================================== -->
+
+                    <assign name="PrepareLoanUpdate">
+                        <copy>
+                            <from variable="loanId"/>
+                            <to>$loanUpdateRequest.LoanApplicationCollection/types:LoanApplication/types:loanId</to>
+                        </copy>
+                        <copy>
+                            <from variable="ltvRatio"/>
+                            <to>$loanUpdateRequest.LoanApplicationCollection/types:LoanApplication/types:ltvRatio</to>
+                        </copy>
+                        <copy>
+                            <from variable="decision"/>
+                            <to>$loanUpdateRequest.LoanApplicationCollection/types:LoanApplication/types:status</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="UpdateLoanApplication"
+                            partnerLink="LoanDBAdapter"
+                            portType="loandb:LoanDB_ptt"
+                            operation="updateLoanApplication"
+                            inputVariable="loanUpdateRequest"/>
+
+                    <!-- ================================================== -->
+                    <!-- Prepare Response                                    -->
+                    <!-- ================================================== -->
+
+                    <assign name="PrepareResponse">
+                        <copy>
+                            <from variable="loanId"/>
+                            <to>$outputVariable.payload/types:loanId</to>
+                        </copy>
+                        <copy>
+                            <from variable="decision"/>
+                            <to>$outputVariable.payload/types:decision</to>
+                        </copy>
+                        <copy>
+                            <from variable="ltvRatio"/>
+                            <to>$outputVariable.payload/types:ltvRatio</to>
+                        </copy>
+                        <copy>
+                            <from variable="riskScore"/>
+                            <to>$outputVariable.payload/types:riskScore</to>
+                        </copy>
+                        <copy>
+                            <from>$riskAssessmentResponse.RiskAssessmentOutput/types:notes</from>
+                            <to>$outputVariable.payload/types:decisionNotes</to>
+                        </copy>
+                    </assign>
+
+                    <reply name="ReplyToClient"
+                           partnerLink="LoanDBClient"
+                           portType="client:LoanDBProcess"
+                           operation="submitLoanApplication"
+                           variable="outputVariable"/>
+
+                </sequence>
+            </onMessage>
+
+            <!-- ========================================================== -->
+            <!-- Operation 2: getLoanStatus                                 -->
+            <!-- ========================================================== -->
+            <onMessage partnerLink="LoanDBClient"
+                       portType="client:LoanDBProcess"
+                       operation="getLoanStatus"
+                       variable="statusInputVariable">
+                <sequence name="GetStatusSequence">
+
+                    <!-- Select Loan by ID (LoanDB.selectLoanById) -->
+                    <assign name="PrepareLoanSelect">
+                        <copy>
+                            <from>$statusInputVariable.payload/types:loanId</from>
+                            <to>$loanSelectRequest.loanId</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="SelectLoanById"
+                            partnerLink="LoanDBAdapter"
+                            portType="loandb:LoanDB_ptt"
+                            operation="selectLoanById"
+                            inputVariable="loanSelectRequest"
+                            outputVariable="loanSelectResponse"/>
+
+                    <!-- Select Decision by Loan (DecisionDB.selectDecisionByLoan) -->
+                    <assign name="PrepareDecisionSelect">
+                        <copy>
+                            <from>$statusInputVariable.payload/types:loanId</from>
+                            <to>$decisionSelectRequest.loanId</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="SelectDecisionByLoan"
+                            partnerLink="DecisionDBAdapter"
+                            portType="decisiondb:DecisionDB_ptt"
+                            operation="selectDecisionByLoan"
+                            inputVariable="decisionSelectRequest"
+                            outputVariable="decisionSelectResponse"/>
+
+                    <!-- Prepare Status Response -->
+                    <assign name="PrepareStatusResponse">
+                        <copy>
+                            <from>$loanSelectResponse.LoanApplicationCollection/types:LoanApplication/types:status</from>
+                            <to>$statusOutputVariable.payload/types:status</to>
+                        </copy>
+                        <copy>
+                            <from>$decisionSelectResponse.LoanDecisionCollection/types:LoanDecision/types:decision</from>
+                            <to>$statusOutputVariable.payload/types:decision</to>
+                        </copy>
+                        <copy>
+                            <from>$loanSelectResponse.LoanApplicationCollection/types:LoanApplication/types:updatedAt</from>
+                            <to>$statusOutputVariable.payload/types:lastUpdated</to>
+                        </copy>
+                    </assign>
+
+                    <reply name="ReplyStatus"
+                           partnerLink="LoanDBClient"
+                           portType="client:LoanDBProcess"
+                           operation="getLoanStatus"
+                           variable="statusOutputVariable"/>
+
+                </sequence>
+            </onMessage>
+
+            <!-- ========================================================== -->
+            <!-- Operation 3: updateLoanDecision                            -->
+            <!-- ========================================================== -->
+            <onMessage partnerLink="LoanDBClient"
+                       portType="client:LoanDBProcess"
+                       operation="updateLoanDecision"
+                       variable="updateInputVariable">
+                <sequence name="UpdateDecisionSequence">
+
+                    <!-- Update Loan Application (LoanDB.updateLoanApplication) -->
+                    <assign name="PrepareUpdateLoan">
+                        <copy>
+                            <from>$updateInputVariable.payload/types:loanId</from>
+                            <to>$loanUpdateRequest.LoanApplicationCollection/types:LoanApplication/types:loanId</to>
+                        </copy>
+                        <copy>
+                            <from>$updateInputVariable.payload/types:decision</from>
+                            <to>$loanUpdateRequest.LoanApplicationCollection/types:LoanApplication/types:status</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="UpdateLoan"
+                            partnerLink="LoanDBAdapter"
+                            portType="loandb:LoanDB_ptt"
+                            operation="updateLoanApplication"
+                            inputVariable="loanUpdateRequest"/>
+
+                    <!-- Insert New Decision (DecisionDB.insertDecision) -->
+                    <assign name="PrepareNewDecision">
+                        <copy>
+                            <from>ora:generateGUID()</from>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:decisionId</to>
+                        </copy>
+                        <copy>
+                            <from>$updateInputVariable.payload/types:loanId</from>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:loanId</to>
+                        </copy>
+                        <copy>
+                            <from>$updateInputVariable.payload/types:decision</from>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:decision</to>
+                        </copy>
+                        <copy>
+                            <from>$updateInputVariable.payload/types:reviewerNotes</from>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:notes</to>
+                        </copy>
+                        <copy>
+                            <from>'MANUAL_REVIEWER'</from>
+                            <to>$decisionInsertRequest.LoanDecisionCollection/types:LoanDecision/types:reviewedBy</to>
+                        </copy>
+                    </assign>
+
+                    <invoke name="InsertNewDecision"
+                            partnerLink="DecisionDBAdapter"
+                            portType="decisiondb:DecisionDB_ptt"
+                            operation="insertDecision"
+                            inputVariable="decisionInsertRequest"/>
+
+                    <!-- Prepare Update Response -->
+                    <assign name="PrepareUpdateResponse">
+                        <copy>
+                            <from>'SUCCESS'</from>
+                            <to>$updateOutputVariable.payload/types:status</to>
+                        </copy>
+                        <copy>
+                            <from>ora:getCurrentDateTime()</from>
+                            <to>$updateOutputVariable.payload/types:updatedAt</to>
+                        </copy>
+                    </assign>
+
+                    <reply name="ReplyUpdate"
+                           partnerLink="LoanDBClient"
+                           portType="client:LoanDBProcess"
+                           operation="updateLoanDecision"
+                           variable="updateOutputVariable"/>
+
+                </sequence>
+            </onMessage>
+
+        </pick>
+
+    </sequence>
+
+</process>

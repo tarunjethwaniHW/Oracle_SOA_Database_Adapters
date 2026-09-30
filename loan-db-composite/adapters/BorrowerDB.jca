@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adapter-config name="BorrowerDB"
+                adapter="db"
+                wsdlLocation="BorrowerDB.wsdl"
+                xmlns="http://platform.integration.oracle/blocks/adapter/fw/metadata">
+
+    <!-- ================================================================== -->
+    <!-- Database Adapter - Borrower Information                            -->
+    <!-- Provides CRUD operations for BORROWERS table                       -->
+    <!-- Connection: eis/DB/LendWiseDS                                      -->
+    <!-- ================================================================== -->
+
+    <connection-factory location="eis/DB/LendWiseDS"
+                        UIConnectionName="LendWiseDS"
+                        adapterRef=""/>
+
+    <!-- Insert Borrower -->
+    <endpoint-interaction portType="BorrowerDB_ptt" operation="insertBorrower">
+        <interaction-spec className="oracle.tip.adapter.db.DBWriteInteractionSpec">
+            <property name="DescriptorName" value="BorrowerDB.Borrower"/>
+            <property name="DmlType" value="INSERT"/>
+            <property name="MappingsMetaDataURL" value="BorrowerDB-or-mappings.xml"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+    <!-- Select Borrower by SSN -->
+    <endpoint-interaction portType="BorrowerDB_ptt" operation="selectBorrowerBySSN">
+        <interaction-spec className="oracle.tip.adapter.db.DBReadInteractionSpec">
+            <property name="DescriptorName" value="BorrowerDB.Borrower"/>
+            <property name="QueryObjectName" value="selectBySSN"/>
+            <property name="MappingsMetaDataURL" value="BorrowerDB-or-mappings.xml"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+            <property name="MaxTransactionSize" value="10"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+    <!-- Update Borrower Credit Score -->
+    <endpoint-interaction portType="BorrowerDB_ptt" operation="updateBorrowerCredit">
+        <interaction-spec className="oracle.tip.adapter.db.DBWriteInteractionSpec">
+            <property name="DescriptorName" value="BorrowerDB.Borrower"/>
+            <property name="DmlType" value="UPDATE"/>
+            <property name="MappingsMetaDataURL" value="BorrowerDB-or-mappings.xml"/>
+            <property name="DetectOmissions" value="true"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+</adapter-config>

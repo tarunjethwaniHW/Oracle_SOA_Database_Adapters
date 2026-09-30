@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions name="LoanDBProcess"
+                  targetNamespace="http://xmlns.oracle.com/LendWise/LoanDBProcess"
+                  xmlns:tns="http://xmlns.oracle.com/LendWise/LoanDBProcess"
+                  xmlns:types="http://xmlns.oracle.com/LendWise/LoanDBProcess/types"
+                  xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+                  xmlns:plnk="http://docs.oasis-open.org/wsbpel/2.0/plnktype">
+
+    <!-- Import XSD Types -->
+    <wsdl:types>
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+            <xsd:import namespace="http://xmlns.oracle.com/LendWise/LoanDBProcess/types"
+                        schemaLocation="LoanDBTypes.xsd"/>
+        </xsd:schema>
+    </wsdl:types>
+
+    <!-- Messages -->
+    <wsdl:message name="LoanApplicationRequestMessage">
+        <wsdl:part name="payload" element="types:LoanApplicationRequest"/>
+    </wsdl:message>
+    <wsdl:message name="LoanApplicationResponseMessage">
+        <wsdl:part name="payload" element="types:LoanApplicationResponse"/>
+    </wsdl:message>
+    <wsdl:message name="LoanStatusRequestMessage">
+        <wsdl:part name="payload" element="types:LoanStatusRequest"/>
+    </wsdl:message>
+    <wsdl:message name="LoanStatusResponseMessage">
+        <wsdl:part name="payload" element="types:LoanStatusResponse"/>
+    </wsdl:message>
+    <wsdl:message name="UpdateDecisionRequestMessage">
+        <wsdl:part name="payload" element="types:UpdateDecisionRequest"/>
+    </wsdl:message>
+    <wsdl:message name="UpdateDecisionResponseMessage">
+        <wsdl:part name="payload" element="types:UpdateDecisionResponse"/>
+    </wsdl:message>
+    <wsdl:message name="LoanDBFaultMessage">
+        <wsdl:part name="fault" element="types:FaultDetail"/>
+    </wsdl:message>
+
+    <!-- PortType - Service Operations -->
+    <wsdl:portType name="LoanDBProcess">
+        <wsdl:operation name="submitLoanApplication">
+            <wsdl:documentation>
+                Submit a new loan application. Triggers BPEL orchestration that:
+                1. Inserts borrower (BorrowerDB.insertBorrower)
+                2. Inserts loan application (LoanDB.insertLoanApplication)
+                3. Calculates LTV (LoanDB.calculateLTV - stored procedure)
+                4. Runs risk assessment (DecisionDB.runRiskAssessment - stored procedure)
+                5. Inserts decision (DecisionDB.insertDecision)
+            </wsdl:documentation>
+            <wsdl:input message="tns:LoanApplicationRequestMessage"/>
+            <wsdl:output message="tns:LoanApplicationResponseMessage"/>
+            <wsdl:fault name="loanDBFault" message="tns:LoanDBFaultMessage"/>
+        </wsdl:operation>
+
+        <wsdl:operation name="getLoanStatus">
+            <wsdl:documentation>
+                Get loan status by ID. Triggers BPEL orchestration that:
+                1. Selects loan by ID (LoanDB.selectLoanById)
+                2. Selects decision by loan (DecisionDB.selectDecisionByLoan)
+            </wsdl:documentation>
+            <wsdl:input message="tns:LoanStatusRequestMessage"/>
+            <wsdl:output message="tns:LoanStatusResponseMessage"/>
+            <wsdl:fault name="loanDBFault" message="tns:LoanDBFaultMessage"/>
+        </wsdl:operation>
+
+        <wsdl:operation name="updateLoanDecision">
+            <wsdl:documentation>
+                Update loan decision (for manual review). Triggers BPEL orchestration that:
+                1. Updates loan application (LoanDB.updateLoanApplication)
+                2. Inserts new decision (DecisionDB.insertDecision)
+            </wsdl:documentation>
+            <wsdl:input message="tns:UpdateDecisionRequestMessage"/>
+            <wsdl:output message="tns:UpdateDecisionResponseMessage"/>
+            <wsdl:fault name="loanDBFault" message="tns:LoanDBFaultMessage"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <!-- SOAP Binding -->
+    <wsdl:binding name="LoanDBProcessBinding" type="tns:LoanDBProcess">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+
+        <wsdl:operation name="submitLoanApplication">
+            <soap:operation soapAction="submitLoanApplication"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+            <wsdl:fault name="loanDBFault">
+                <soap:fault name="loanDBFault" use="literal"/>
+            </wsdl:fault>
+        </wsdl:operation>
+
+        <wsdl:operation name="getLoanStatus">
+            <soap:operation soapAction="getLoanStatus"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+            <wsdl:fault name="loanDBFault">
+                <soap:fault name="loanDBFault" use="literal"/>
+            </wsdl:fault>
+        </wsdl:operation>
+
+        <wsdl:operation name="updateLoanDecision">
+            <soap:operation soapAction="updateLoanDecision"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+            <wsdl:fault name="loanDBFault">
+                <soap:fault name="loanDBFault" use="literal"/>
+            </wsdl:fault>
+        </wsdl:operation>
+    </wsdl:binding>
+
+    <!-- Service Endpoint -->
+    <wsdl:service name="loandb_client_ep">
+        <wsdl:port name="LoanDBProcess_pt" binding="tns:LoanDBProcessBinding">
+            <soap:address location="http://localhost:8001/soap/LoanDBProcess"/>
+        </wsdl:port>
+    </wsdl:service>
+
+    <!-- Partner Link Types for BPEL -->
+    <plnk:partnerLinkType name="LoanDBProcessPLT">
+        <plnk:role name="LoanDBProcessProvider" portType="tns:LoanDBProcess"/>
+    </plnk:partnerLinkType>
+
+</wsdl:definitions>

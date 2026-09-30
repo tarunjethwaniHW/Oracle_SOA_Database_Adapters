@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions name="DecisionDB"
+                  targetNamespace="http://xmlns.oracle.com/LendWise/adapter/db/DecisionDB"
+                  xmlns:tns="http://xmlns.oracle.com/LendWise/adapter/db/DecisionDB"
+                  xmlns:types="http://xmlns.oracle.com/LendWise/LoanDBProcess/types"
+                  xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+                  xmlns:jca="http://xmlns.oracle.com/pcbpel/wsdl/jca/"
+                  xmlns:plnk="http://docs.oasis-open.org/wsbpel/2.0/plnktype">
+
+    <!-- Import XSD Types -->
+    <wsdl:types>
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+            <xsd:import namespace="http://xmlns.oracle.com/LendWise/LoanDBProcess/types"
+                        schemaLocation="../LoanDBTypes.xsd"/>
+        </xsd:schema>
+    </wsdl:types>
+
+    <!-- Messages for DB Operations -->
+    <wsdl:message name="LoanDecisionCollectionMessage">
+        <wsdl:part name="LoanDecisionCollection" element="types:LoanDecisionCollection"/>
+    </wsdl:message>
+    <wsdl:message name="DecisionSelectByLoanMessage">
+        <wsdl:part name="loanId" type="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema"/>
+    </wsdl:message>
+    <wsdl:message name="RiskAssessmentInputMessage">
+        <wsdl:part name="RiskAssessmentInput" element="types:RiskAssessmentInput"/>
+    </wsdl:message>
+    <wsdl:message name="RiskAssessmentOutputMessage">
+        <wsdl:part name="RiskAssessmentOutput" element="types:RiskAssessmentOutput"/>
+    </wsdl:message>
+
+    <!-- PortType - Database Adapter Operations -->
+    <wsdl:portType name="DecisionDB_ptt">
+        <wsdl:operation name="insertDecision">
+            <wsdl:documentation>
+                Insert new loan decision record.
+                JCA: oracle.tip.adapter.db.DBWriteInteractionSpec
+                DmlType: INSERT
+                DescriptorName: DecisionDB.LoanDecision
+            </wsdl:documentation>
+            <wsdl:input message="tns:LoanDecisionCollectionMessage"/>
+        </wsdl:operation>
+
+        <wsdl:operation name="selectDecisionByLoan">
+            <wsdl:documentation>
+                Select decision by loan ID.
+                JCA: oracle.tip.adapter.db.DBReadInteractionSpec
+                QueryObjectName: selectByLoanId
+                DescriptorName: DecisionDB.LoanDecision
+            </wsdl:documentation>
+            <wsdl:input message="tns:DecisionSelectByLoanMessage"/>
+            <wsdl:output message="tns:LoanDecisionCollectionMessage"/>
+        </wsdl:operation>
+
+        <wsdl:operation name="runRiskAssessment">
+            <wsdl:documentation>
+                Run automated risk assessment.
+                JCA: oracle.tip.adapter.db.DBStoredProcedureInteractionSpec
+                Schema: LENDWISE
+                Package: DECISION_PKG
+                Procedure: RUN_RISK_ASSESSMENT
+            </wsdl:documentation>
+            <wsdl:input message="tns:RiskAssessmentInputMessage"/>
+            <wsdl:output message="tns:RiskAssessmentOutputMessage"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <!-- JCA Binding -->
+    <wsdl:binding name="DecisionDB_binding" type="tns:DecisionDB_ptt">
+        <jca:binding/>
+        <wsdl:operation name="insertDecision">
+            <jca:operation/>
+            <wsdl:input/>
+        </wsdl:operation>
+        <wsdl:operation name="selectDecisionByLoan">
+            <jca:operation/>
+            <wsdl:input/>
+            <wsdl:output/>
+        </wsdl:operation>
+        <wsdl:operation name="runRiskAssessment">
+            <jca:operation/>
+            <wsdl:input/>
+            <wsdl:output/>
+        </wsdl:operation>
+    </wsdl:binding>
+
+    <!-- Service -->
+    <wsdl:service name="DecisionDB_service">
+        <wsdl:port name="DecisionDB_pt" binding="tns:DecisionDB_binding">
+            <jca:address location="eis/DB/LendWiseDS"/>
+        </wsdl:port>
+    </wsdl:service>
+
+    <!-- Partner Link Type -->
+    <plnk:partnerLinkType name="DecisionDB_plt">
+        <plnk:role name="DecisionDBProvider" portType="tns:DecisionDB_ptt"/>
+    </plnk:partnerLinkType>
+
+</wsdl:definitions>

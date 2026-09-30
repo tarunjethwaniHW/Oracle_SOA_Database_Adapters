@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            targetNamespace="http://xmlns.oracle.com/LendWise/LoanDBProcess/types"
+            xmlns:tns="http://xmlns.oracle.com/LendWise/LoanDBProcess/types"
+            elementFormDefault="qualified">
+
+    <!-- Request/Response Elements -->
+
+    <xsd:element name="LoanApplicationRequest" type="tns:LoanApplicationRequestType"/>
+    <xsd:element name="LoanApplicationResponse" type="tns:LoanApplicationResponseType"/>
+    <xsd:element name="LoanStatusRequest" type="tns:LoanStatusRequestType"/>
+    <xsd:element name="LoanStatusResponse" type="tns:LoanStatusResponseType"/>
+    <xsd:element name="UpdateDecisionRequest" type="tns:UpdateDecisionRequestType"/>
+    <xsd:element name="UpdateDecisionResponse" type="tns:UpdateDecisionResponseType"/>
+    <xsd:element name="FaultDetail" type="tns:FaultDetailType"/>
+
+    <!-- Complex Types -->
+
+    <xsd:complexType name="LoanApplicationRequestType">
+        <xsd:sequence>
+            <xsd:element name="applicantName" type="xsd:string"/>
+            <xsd:element name="ssn" type="xsd:string"/>
+            <xsd:element name="loanAmount" type="xsd:decimal"/>
+            <xsd:element name="propertyValue" type="xsd:decimal"/>
+            <xsd:element name="monthlyIncome" type="xsd:decimal"/>
+            <xsd:element name="propertyAddress" type="xsd:string"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="LoanApplicationResponseType">
+        <xsd:sequence>
+            <xsd:element name="loanId" type="xsd:string"/>
+            <xsd:element name="decision" type="xsd:string"/>
+            <xsd:element name="ltvRatio" type="xsd:decimal"/>
+            <xsd:element name="riskScore" type="xsd:int"/>
+            <xsd:element name="decisionNotes" type="xsd:string"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="LoanStatusRequestType">
+        <xsd:sequence>
+            <xsd:element name="loanId" type="xsd:string"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="LoanStatusResponseType">
+        <xsd:sequence>
+            <xsd:element name="status" type="xsd:string"/>
+            <xsd:element name="decision" type="xsd:string"/>
+            <xsd:element name="lastUpdated" type="xsd:dateTime"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="UpdateDecisionRequestType">
+        <xsd:sequence>
+            <xsd:element name="loanId" type="xsd:string"/>
+            <xsd:element name="decision" type="xsd:string"/>
+            <xsd:element name="reviewerNotes" type="xsd:string" minOccurs="0"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="UpdateDecisionResponseType">
+        <xsd:sequence>
+            <xsd:element name="status" type="xsd:string"/>
+            <xsd:element name="updatedAt" type="xsd:dateTime"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="FaultDetailType">
+        <xsd:sequence>
+            <xsd:element name="errorCode" type="xsd:string"/>
+            <xsd:element name="errorMessage" type="xsd:string"/>
+            <xsd:element name="timestamp" type="xsd:dateTime"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- Database Entity Types (for DB Adapter messages) -->
+
+    <xsd:element name="BorrowerCollection" type="tns:BorrowerCollectionType"/>
+    <xsd:complexType name="BorrowerCollectionType">
+        <xsd:sequence>
+            <xsd:element name="Borrower" type="tns:BorrowerType" maxOccurs="unbounded"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="BorrowerType">
+        <xsd:sequence>
+            <xsd:element name="borrowerId" type="xsd:long"/>
+            <xsd:element name="ssn" type="xsd:string"/>
+            <xsd:element name="name" type="xsd:string"/>
+            <xsd:element name="creditScore" type="xsd:int" minOccurs="0"/>
+            <xsd:element name="monthlyIncome" type="xsd:decimal"/>
+            <xsd:element name="createdAt" type="xsd:dateTime" minOccurs="0"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:element name="LoanApplicationCollection" type="tns:LoanApplicationCollectionType"/>
+    <xsd:complexType name="LoanApplicationCollectionType">
+        <xsd:sequence>
+            <xsd:element name="LoanApplication" type="tns:LoanApplicationType" maxOccurs="unbounded"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="LoanApplicationType">
+        <xsd:sequence>
+            <xsd:element name="loanId" type="xsd:string"/>
+            <xsd:element name="borrowerId" type="xsd:long"/>
+            <xsd:element name="loanAmount" type="xsd:decimal"/>
+            <xsd:element name="propertyValue" type="xsd:decimal"/>
+            <xsd:element name="propertyAddress" type="xsd:string"/>
+            <xsd:element name="ltvRatio" type="xsd:decimal" minOccurs="0"/>
+            <xsd:element name="status" type="xsd:string"/>
+            <xsd:element name="createdAt" type="xsd:dateTime" minOccurs="0"/>
+            <xsd:element name="updatedAt" type="xsd:dateTime" minOccurs="0"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:element name="LoanDecisionCollection" type="tns:LoanDecisionCollectionType"/>
+    <xsd:complexType name="LoanDecisionCollectionType">
+        <xsd:sequence>
+            <xsd:element name="LoanDecision" type="tns:LoanDecisionType" maxOccurs="unbounded"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="LoanDecisionType">
+        <xsd:sequence>
+            <xsd:element name="decisionId" type="xsd:string"/>
+            <xsd:element name="loanId" type="xsd:string"/>
+            <xsd:element name="decision" type="xsd:string"/>
+            <xsd:element name="riskScore" type="xsd:int"/>
+            <xsd:element name="notes" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="reviewedBy" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="createdAt" type="xsd:dateTime" minOccurs="0"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <!-- Stored Procedure Types -->
+
+    <xsd:element name="CalculateLTVInput" type="tns:CalculateLTVInputType"/>
+    <xsd:complexType name="CalculateLTVInputType">
+        <xsd:sequence>
+            <xsd:element name="loanAmount" type="xsd:decimal"/>
+            <xsd:element name="propertyValue" type="xsd:decimal"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:element name="CalculateLTVOutput" type="tns:CalculateLTVOutputType"/>
+    <xsd:complexType name="CalculateLTVOutputType">
+        <xsd:sequence>
+            <xsd:element name="ltvRatio" type="xsd:decimal"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:element name="RiskAssessmentInput" type="tns:RiskAssessmentInputType"/>
+    <xsd:complexType name="RiskAssessmentInputType">
+        <xsd:sequence>
+            <xsd:element name="loanId" type="xsd:string"/>
+            <xsd:element name="creditScore" type="xsd:int"/>
+            <xsd:element name="ltvRatio" type="xsd:decimal"/>
+            <xsd:element name="monthlyIncome" type="xsd:decimal"/>
+            <xsd:element name="loanAmount" type="xsd:decimal"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:element name="RiskAssessmentOutput" type="tns:RiskAssessmentOutputType"/>
+    <xsd:complexType name="RiskAssessmentOutputType">
+        <xsd:sequence>
+            <xsd:element name="riskScore" type="xsd:int"/>
+            <xsd:element name="recommendation" type="xsd:string"/>
+            <xsd:element name="notes" type="xsd:string"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+</xsd:schema>

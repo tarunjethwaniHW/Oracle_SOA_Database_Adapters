@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<toplink:object-persistence version="Oracle TopLink - 12c (12.2.1.4)"
+    xmlns:opm="http://xmlns.oracle.com/ias/xsds/opm"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:toplink="http://xmlns.oracle.com/ias/xsds/toplink"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <toplink:name>DecisionDB</toplink:name>
+
+    <toplink:class-mapping-descriptors>
+        <!-- ================================================================== -->
+        <!-- LoanDecision Entity Mapping                                         -->
+        <!-- DescriptorName: DecisionDB.LoanDecision → Table: LOAN_DECISIONS     -->
+        <!-- ================================================================== -->
+        <toplink:class-mapping-descriptor xsi:type="toplink:relational-class-mapping-descriptor">
+            <toplink:class>DecisionDB.LoanDecision</toplink:class>
+            <toplink:alias>LoanDecision</toplink:alias>
+            <toplink:primary-key>
+                <toplink:field table="LOAN_DECISIONS" name="DECISION_ID" xsi:type="toplink:column"/>
+            </toplink:primary-key>
+
+            <toplink:events/>
+            <toplink:querying/>
+
+            <toplink:tables>
+                <toplink:table name="LOAN_DECISIONS"/>
+            </toplink:tables>
+
+            <toplink:attribute-mappings>
+                <toplink:attribute-mapping xsi:type="toplink:direct-mapping">
+                    <toplink:attribute-name>decisionId</toplink:attribute-name>
+                    <toplink:field table="LOAN_DECISIONS" name="DECISION_ID" xsi:type="toplink:column"/>
+                </toplink:attribute-mapping>
+
+                <toplink:attribute-mapping xsi:type="toplink:direct-mapping">
+                    <toplink:attribute-name>loanId</toplink:attribute-name>
+                    <toplink:field table="LOAN_DECISIONS" name="LOAN_ID" xsi:type="toplink:column"/>
+                </toplink:attribute-mapping>
+
+                <toplink:attribute-mapping xsi:type="toplink:direct-mapping">
+                    <toplink:attribute-name>decision</toplink:attribute-name>
+                    <toplink:field table="LOAN_DECISIONS" name="DECISION" xsi:type="toplink:column"/>
+                </toplink:attribute-mapping>
+
+                <toplink:attribute-mapping xsi:type="toplink:direct-mapping">
+                    <toplink:attribute-name>riskScore</toplink:attribute-name>
+                    <toplink:field table="LOAN_DECISIONS" name="RISK_SCORE" xsi:type="toplink:column"/>
+                </toplink:attribute-mapping>
+
+                <toplink:attribute-mapping xsi:type="toplink:direct-mapping">
+                    <toplink:attribute-name>notes</toplink:attribute-name>
+                    <toplink:field table="LOAN_DECISIONS" name="NOTES" xsi:type="toplink:column"/>
+                </toplink:attribute-mapping>
+
+                <toplink:attribute-mapping xsi:type="toplink:direct-mapping">
+                    <toplink:attribute-name>reviewedBy</toplink:attribute-name>
+                    <toplink:field table="LOAN_DECISIONS" name="REVIEWED_BY" xsi:type="toplink:column"/>
+                </toplink:attribute-mapping>
+
+                <toplink:attribute-mapping xsi:type="toplink:direct-mapping">
+                    <toplink:attribute-name>createdAt</toplink:attribute-name>
+                    <toplink:field table="LOAN_DECISIONS" name="CREATED_AT" xsi:type="toplink:column"/>
+                </toplink:attribute-mapping>
+            </toplink:attribute-mappings>
+
+            <toplink:descriptor-type>independent</toplink:descriptor-type>
+            <toplink:instantiation/>
+            <toplink:copying/>
+            <toplink:change-policy/>
+            <toplink:tables>
+                <toplink:table name="LOAN_DECISIONS"/>
+            </toplink:tables>
+        </toplink:class-mapping-descriptor>
+    </toplink:class-mapping-descriptors>
+
+    <!-- ================================================================== -->
+    <!-- Named Queries for Read Operations                                   -->
+    <!-- ================================================================== -->
+    <toplink:queries>
+        <toplink:query name="selectByLoanId" xsi:type="toplink:read-object-query">
+            <toplink:reference-class>DecisionDB.LoanDecision</toplink:reference-class>
+            <toplink:selection-criteria xsi:type="toplink:expression">
+                <toplink:arguments>
+                    <toplink:argument name="loanId" type="java.lang.String"/>
+                </toplink:arguments>
+                <toplink:expression operator="equal">
+                    <toplink:left xsi:type="toplink:field-expression">
+                        <toplink:field table="LOAN_DECISIONS" name="LOAN_ID"/>
+                    </toplink:left>
+                    <toplink:right xsi:type="toplink:parameter-expression">
+                        <toplink:parameter name="loanId"/>
+                    </toplink:right>
+                </toplink:expression>
+            </toplink:selection-criteria>
+        </toplink:query>
+    </toplink:queries>
+
+</toplink:object-persistence>

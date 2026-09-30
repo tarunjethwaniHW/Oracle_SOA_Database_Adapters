@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adapter-config name="DecisionDB"
+                adapter="db"
+                wsdlLocation="DecisionDB.wsdl"
+                xmlns="http://platform.integration.oracle/blocks/adapter/fw/metadata">
+
+    <!-- ================================================================== -->
+    <!-- Database Adapter - Loan Decisions                                  -->
+    <!-- Provides CRUD operations for LOAN_DECISIONS table                  -->
+    <!-- Connection: eis/DB/LendWiseDS                                      -->
+    <!-- ================================================================== -->
+
+    <connection-factory location="eis/DB/LendWiseDS"
+                        UIConnectionName="LendWiseDS"
+                        adapterRef=""/>
+
+    <!-- Insert Decision -->
+    <endpoint-interaction portType="DecisionDB_ptt" operation="insertDecision">
+        <interaction-spec className="oracle.tip.adapter.db.DBWriteInteractionSpec">
+            <property name="DescriptorName" value="DecisionDB.LoanDecision"/>
+            <property name="DmlType" value="INSERT"/>
+            <property name="MappingsMetaDataURL" value="DecisionDB-or-mappings.xml"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+    <!-- Select Decision by Loan ID -->
+    <endpoint-interaction portType="DecisionDB_ptt" operation="selectDecisionByLoan">
+        <interaction-spec className="oracle.tip.adapter.db.DBReadInteractionSpec">
+            <property name="DescriptorName" value="DecisionDB.LoanDecision"/>
+            <property name="QueryObjectName" value="selectByLoanId"/>
+            <property name="MappingsMetaDataURL" value="DecisionDB-or-mappings.xml"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+            <property name="MaxTransactionSize" value="100"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+    <!-- Stored Procedure: Run Risk Assessment -->
+    <endpoint-interaction portType="DecisionDB_ptt" operation="runRiskAssessment">
+        <interaction-spec className="oracle.tip.adapter.db.DBStoredProcedureInteractionSpec">
+            <property name="SchemaName" value="LENDWISE"/>
+            <property name="PackageName" value="DECISION_PKG"/>
+            <property name="ProcedureName" value="RUN_RISK_ASSESSMENT"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+</adapter-config>

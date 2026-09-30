@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<adapter-config name="LoanDB"
+                adapter="db"
+                wsdlLocation="LoanDB.wsdl"
+                xmlns="http://platform.integration.oracle/blocks/adapter/fw/metadata">
+
+    <!-- ================================================================== -->
+    <!-- Database Adapter - Loan Applications                               -->
+    <!-- Provides CRUD operations for LOAN_APPLICATIONS table               -->
+    <!-- Connection: eis/DB/LendWiseDS                                      -->
+    <!-- ================================================================== -->
+
+    <connection-factory location="eis/DB/LendWiseDS"
+                        UIConnectionName="LendWiseDS"
+                        adapterRef=""/>
+
+    <!-- Insert Loan Application -->
+    <endpoint-interaction portType="LoanDB_ptt" operation="insertLoanApplication">
+        <interaction-spec className="oracle.tip.adapter.db.DBWriteInteractionSpec">
+            <property name="DescriptorName" value="LoanDB.LoanApplication"/>
+            <property name="DmlType" value="INSERT"/>
+            <property name="MappingsMetaDataURL" value="LoanDB-or-mappings.xml"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+    <!-- Update Loan Application -->
+    <endpoint-interaction portType="LoanDB_ptt" operation="updateLoanApplication">
+        <interaction-spec className="oracle.tip.adapter.db.DBWriteInteractionSpec">
+            <property name="DescriptorName" value="LoanDB.LoanApplication"/>
+            <property name="DmlType" value="UPDATE"/>
+            <property name="MappingsMetaDataURL" value="LoanDB-or-mappings.xml"/>
+            <property name="DetectOmissions" value="true"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+    <!-- Select Loan by ID -->
+    <endpoint-interaction portType="LoanDB_ptt" operation="selectLoanById">
+        <interaction-spec className="oracle.tip.adapter.db.DBReadInteractionSpec">
+            <property name="DescriptorName" value="LoanDB.LoanApplication"/>
+            <property name="QueryObjectName" value="selectLoanById"/>
+            <property name="MappingsMetaDataURL" value="LoanDB-or-mappings.xml"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+            <property name="MaxTransactionSize" value="100"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+    <!-- Stored Procedure: Calculate LTV Ratio -->
+    <endpoint-interaction portType="LoanDB_ptt" operation="calculateLTV">
+        <interaction-spec className="oracle.tip.adapter.db.DBStoredProcedureInteractionSpec">
+            <property name="SchemaName" value="LENDWISE"/>
+            <property name="PackageName" value="LOAN_PKG"/>
+            <property name="ProcedureName" value="CALCULATE_LTV"/>
+            <property name="GetActiveUnitOfWork" value="false"/>
+        </interaction-spec>
+    </endpoint-interaction>
+
+</adapter-config>
